@@ -228,3 +228,15 @@ Unit tests with Node's built-in runner (`node --test tests/`), no dependencies:
 Manual check in a mobile viewport (Chrome device toolbar, ~390px wide):
 full flow players → roles → deal → tracker → recap in both languages,
 refresh mid-deal and mid-game, and switching away from the tab on the reveal view.
+
+## 11. Deployment
+
+- Hosted on GitHub Pages from the `main` branch, repository root:
+  `https://mymys91.github.io/warewolf-mod/`. Requires the repository to be public.
+- The site is served from a subpath (`/warewolf-mod/`), so every asset and
+  module import uses a relative path (`./css/style.css`, `./js/app.js`),
+  never an absolute `/` path.
+- No build step: the files in the repository are the deployed files. Tests
+  and docs are published too; this is harmless.
+- Local development: serve the folder with any static server (ES modules do
+  not load from `file://`), e.g. `npx serve .` or `python -m http.server`.
