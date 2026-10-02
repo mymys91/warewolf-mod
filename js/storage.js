@@ -23,10 +23,14 @@ function usable(backend) {
 const isLang = (v) => v === 'vi' || v === 'en';
 const isNameList = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
 const isRoleList = (v) => Array.isArray(v) && v.every((r) => r && typeof r.id === 'string' && r.name && r.rules);
+const isPlayer = (p) => p && typeof p.name === 'string' && typeof p.roleId === 'string';
+const isPhase = (ph) => ph && (ph.kind === 'night' || ph.kind === 'day') && Number.isInteger(ph.number);
 const isSavedGame = (v) => v && typeof v === 'object'
   && (v.stage === 'deal' || v.stage === 'tracker')
   && Number.isInteger(v.dealIndex)
-  && v.game && Array.isArray(v.game.players);
+  && v.game && Array.isArray(v.game.players) && v.game.players.every(isPlayer)
+  && (v.game.events === undefined || Array.isArray(v.game.events))
+  && (v.game.phase === undefined || isPhase(v.game.phase));
 
 export function createStore(backend = globalThis.localStorage) {
   const persistent = !!backend && usable(backend);

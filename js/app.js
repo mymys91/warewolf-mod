@@ -7,6 +7,7 @@ import {
   newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, timeline, CAUSES,
 } from './game.js';
 import { suggestRoles } from './suggest.js';
+import { createTapGuard } from './tapguard.js';
 
 const store = createStore();
 const PLAYER_ERRORS = ['TOO_FEW_PLAYERS', 'TOO_MANY_PLAYERS', 'EMPTY_NAME', 'DUPLICATE_NAME'];
@@ -289,10 +290,11 @@ function deleteCustomRole(role) {
 }
 
 // ---------- Screen 3: deal ----------
-// Taps on "See my role" are ignored this long after a hide, so a double tap
-// on "Seen, hide it" cannot open the next player's role.
-const REVEAL_LOCK_MS = 800;
-let lastHideAt = 0;
+// Deal buttons share one tap window, so a double tap can never land on the
+// button that replaces the one tapped (next player's role, moderator view).
+const dealGuard = createTapGuard(800);
+// Tracker actions that can't be undone (phase change, ending the game).
+const trackerGuard = createTapGuard(600);
 
 function renderDeal() {
   const total = state.dealt.length;
@@ -302,7 +304,7 @@ function renderDeal() {
       el('p', { class: 'muted' }, tr('deal.doneHint')),
       el('button', {
         class: 'primary',
-        onclick: () => { state.game = newGame(state.dealt); go('tracker'); save(); },
+        onclick: dealGuard.wrap(() => { state.game = newGame(state.dealt); go('tracker'); save(); }),
       }, tr('deal.iAmModerator')));
   }
 
@@ -317,12 +319,11 @@ function renderDeal() {
       el('p', { class: 'muted' }, tr('deal.hint', { name: player.name })),
       el('button', {
         class: 'primary',
-        onclick: () => {
-          if (Date.now() - lastHideAt < REVEAL_LOCK_MS) return;
+        onclick: dealGuard.wrap(() => {
           state.revealLang = state.lang;
           state.dealView = 'reveal';
           render();
-        },
+        }),
       }, tr('deal.see')));
   }
 
@@ -339,14 +340,13 @@ function renderDeal() {
       el('p', { class: 'role-rules' }, localize(role.rules, lang))),
     el('button', {
       class: 'primary',
-      onclick: () => {
+      onclick: dealGuard.wrap(() => {
         if (state.dealView !== 'reveal') return;
-        lastHideAt = Date.now();
         state.dealIndex += 1;
         state.dealView = state.dealIndex >= total ? 'done' : 'handoff';
         render();
         save();
-      },
+      }),
     }, t('deal.hide', lang)));
 }
 
@@ -400,7 +400,7 @@ function renderTracker() {
     ? el('div', { class: 'banner', role: 'status' },
       el('strong', {}, tr(`win.${suggestion}`)),
       el('div', { class: 'row' },
-        el('button', { class: 'grow', onclick: () => finishGame(suggestion) }, tr('tracker.confirm')),
+        el('button', { class: 'grow', onclick: trackerGuard.wrap(() => finishGame(suggestion)) }, tr('tracker.confirm')),
         el('button', { class: 'grow', onclick: () => { state.hideBanner = true; render(); } }, tr('tracker.keep'))))
     : null;
 
@@ -413,8 +413,8 @@ function renderTracker() {
     el('div', { class: 'grid-2' },
       el('button', { onclick: openNoteForm }, tr('tracker.note')),
       el('button', { disabled: !game.events.length, onclick: () => applyGame(undo) }, tr('tracker.undo'))),
-    el('button', { class: 'primary', onclick: () => applyGame(nextPhase) }, tr('tracker.next', { phase: upcoming })),
-    el('button', { class: 'danger', style: 'width:100%', onclick: () => openWinnerPicker(suggestion) }, tr('tracker.end')),
+    el('button', { class: 'primary', onclick: trackerGuard.wrap(() => applyGame(nextPhase)) }, tr('tracker.next', { phase: upcoming })),
+    el('button', { class: 'danger', style: 'width:100%', onclick: trackerGuard.wrap(() => openWinnerPicker(suggestion)) }, tr('tracker.end')),
   );
 }
 
@@ -449,7 +449,7 @@ function openWinnerPicker(suggestion) {
     el('div', { class: 'stack' }, options.map((w) => el('button', {
       class: w === suggestion ? 'primary' : '',
       style: 'width:100%',
-      onclick: () => finishGame(w),
+      onclick: trackerGuard.wrap(() => finishGame(w)),
     }, tr(`winner.${w}`), w === suggestion ? ` ${tr('tracker.suggested')}` : ''))),
     el('button', { class: 'ghost', style: 'width:100%', onclick: closeSheet }, tr('common.cancel')),
   );

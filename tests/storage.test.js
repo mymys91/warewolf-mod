@@ -82,3 +82,23 @@ test('undefined backend falls back to memory', () => {
   s.setCustomRoles([role]);
   assert.deepEqual(s.getCustomRoles(), [role]);
 });
+
+test('saved games with malformed players, events or phase are treated as missing', () => {
+  const b = fakeStorage();
+  const base = { stage: 'tracker', dealIndex: 0 };
+  const bad = [
+    { players: [null] },
+    { players: [{ name: 5, roleId: 'werewolf' }] },
+    { players: [{ name: 'An' }] },
+    { players: [{ name: 'An', roleId: 'werewolf' }], events: null },
+    { players: [{ name: 'An', roleId: 'werewolf' }], phase: 'x' },
+    { players: [{ name: 'An', roleId: 'werewolf' }], phase: { kind: 'dusk', number: 1 } },
+    { players: [{ name: 'An', roleId: 'werewolf' }], phase: { kind: 'day', number: '1' } },
+  ];
+  for (const game of bad) {
+    b.setItem('ww.currentGame', JSON.stringify({ ...base, game }));
+    assert.equal(createStore(b).getCurrentGame(), null, JSON.stringify(game));
+  }
+  b.setItem('ww.currentGame', JSON.stringify({ stage: 'deal', dealIndex: 1, game: { players: [{ name: 'An', roleId: 'werewolf' }] } }));
+  assert.notEqual(createStore(b).getCurrentGame(), null, 'deal-stage save without phase/events stays valid');
+});
