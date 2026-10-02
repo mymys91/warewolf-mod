@@ -4,7 +4,7 @@ import { createStore } from './storage.js';
 import { validateSetup, dealRoles } from './deal.js';
 import { allRoles, getRole, createCustomRole, updateCustomRole } from './roles.js';
 import {
-  newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, CAUSES,
+  newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, timeline, CAUSES,
 } from './game.js';
 import { suggestRoles } from './suggest.js';
 
@@ -39,7 +39,7 @@ function el(tag, attrs = {}, ...children) {
     else if (v === true) node.setAttribute(k, '');
     else node.setAttribute(k, v);
   }
-  for (const c of children.flat()) {
+  for (const c of children.flat(Infinity)) {
     if (c === null || c === undefined || c === false) continue;
     node.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -141,6 +141,7 @@ function renderPlayers() {
 
   refresh();
   return el('section', { class: 'stack' },
+    store.persistent ? null : el('p', { class: 'notice' }, tr('storage.notice')),
     el('h2', {}, tr('players.title')),
     countEl,
     ...rows,
@@ -454,11 +455,78 @@ function openWinnerPicker(suggestion) {
   );
 }
 
+// ---------- Screen 5: recap ----------
+function renderRecap() {
+  store.clearCurrentGame();
+  const game = state.game;
+  const customRoles = store.getCustomRoles();
+
+  const players = game.players.map((p) => {
+    const role = getRole(p.roleId, customRoles);
+    const death = deathOf(game, p.name);
+    return el('div', { class: `player card${death ? ' dead' : ''}` },
+      el('span', {}, el('strong', {}, p.name), el('br'),
+        el('span', { class: `meta team-${role.team}` }, `${localize(role.name, state.lang)} · ${tr(`team.${role.team}`)}`)),
+      el('span', { class: 'meta' }, death ? `${tr(`causeBtn.${death.cause}`)} · ${phaseLabel(death.phase, state.lang)}` : tr('recap.alive')));
+  });
+
+  const groups = timeline(game);
+  const events = groups.length
+    ? groups.map(({ phase, events: list }) => [
+      el('h3', {}, phaseLabel(phase, state.lang)),
+      el('ul', {}, list.map((e) => el('li', {},
+        e.type === 'death' ? `${e.player} ${tr(`cause.${e.cause}`)}` : `📝 ${e.text}`))),
+    ])
+    : el('p', { class: 'muted' }, tr('recap.noEvents'));
+
+  return el('section', { class: 'stack' },
+    el('h2', {}, tr('recap.title')),
+    el('div', { class: 'banner center big' }, tr(`win.${game.winner ?? 'undecided'}`)),
+    ...players,
+    el('div', { class: 'timeline' }, el('h2', {}, tr('recap.timeline')), events),
+    el('button', {
+      class: 'primary',
+      onclick: () => {
+        state.game = null;
+        state.dealt = [];
+        state.dealIndex = 0;
+        state.countsFor = null;
+        go('players');
+      },
+    }, tr('recap.newGame')));
+}
+
+// ---------- Resume prompt ----------
+function renderResume() {
+  const saved = store.getCurrentGame();
+  if (!saved) return renderPlayers();
+  const resume = () => {
+    const players = saved.game.players;
+    state.players = players.map((p) => p.name);
+    if (saved.stage === 'deal') {
+      state.dealt = players;
+      state.dealIndex = Math.max(0, Math.min(saved.dealIndex, players.length));
+      state.dealView = state.dealIndex >= players.length ? 'done' : 'handoff';
+      state.game = null;
+      go('deal');
+    } else {
+      state.game = { ...newGame(players), ...saved.game };
+      go('tracker');
+    }
+  };
+  return el('section', { class: 'stack center screen-fill' },
+    el('p', { class: 'big' }, tr('resume.title')),
+    el('button', { class: 'primary', onclick: resume }, tr('resume.yes')),
+    el('button', { onclick: () => { store.clearCurrentGame(); go('players'); } }, tr('resume.no')));
+}
+
 const SCREENS = {
   players: renderPlayers,
   roles: renderRoles,
   deal: renderDeal,
   tracker: renderTracker,
+  recap: renderRecap,
+  resume: renderResume,
 };
 
 function render() {
@@ -466,4 +534,5 @@ function render() {
   appEl.replaceChildren(SCREENS[state.screen]());
 }
 
+if (store.getCurrentGame()) state.screen = 'resume';
 render();

@@ -82,6 +82,17 @@ export const UI = {
   'err.BAD_CAUSE': { vi: 'Lý do không hợp lệ.', en: 'Invalid cause.' },
   'err.EMPTY_NOTE': { vi: 'Ghi chú đang trống.', en: 'The note is empty.' },
 
+  'recap.title': { vi: 'Tổng kết ván', en: 'Game recap' },
+  'recap.alive': { vi: 'Còn sống', en: 'Alive' },
+  'recap.timeline': { vi: 'Diễn biến', en: 'What happened' },
+  'recap.noEvents': { vi: 'Không có sự kiện nào được ghi lại.', en: 'No events were recorded.' },
+  'recap.newGame': { vi: 'Ván mới', en: 'New game' },
+
+  'resume.title': { vi: 'Tiếp tục ván đang chơi?', en: 'Continue the current game?' },
+  'resume.yes': { vi: 'Tiếp tục', en: 'Continue' },
+  'resume.no': { vi: 'Bỏ ván này, bắt đầu lại', en: 'Discard it and start over' },
+  'storage.notice': { vi: 'Trình duyệt không lưu được dữ liệu. Ứng dụng vẫn chạy nhưng sẽ quên mọi thứ khi tải lại trang.', en: 'This browser can\'t save data. The app still works but forgets everything when the page reloads.' },
+
   'team.wolf': { vi: 'Phe Sói', en: 'Werewolves' },
   'team.village': { vi: 'Phe Dân', en: 'Village' },
   'team.neutral': { vi: 'Trung lập', en: 'Neutral' },
