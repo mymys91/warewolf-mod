@@ -1,0 +1,8 @@
+{
+  "name": "warewolf-mod",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
