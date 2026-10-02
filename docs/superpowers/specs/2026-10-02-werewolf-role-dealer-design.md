@@ -1,7 +1,7 @@
 # Werewolf Role Dealer & Moderator Assistant — Design
 
 Date: 2026-10-02
-Status: Draft, awaiting review
+Status: Approved
 
 ## 1. Purpose
 
