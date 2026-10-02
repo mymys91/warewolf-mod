@@ -2,7 +2,8 @@
 import { t, localize } from './i18n.js';
 import { createStore } from './storage.js';
 import { validateSetup, dealRoles } from './deal.js';
-import { allRoles, createCustomRole, updateCustomRole } from './roles.js';
+import { allRoles, getRole, createCustomRole, updateCustomRole } from './roles.js';
+import { newGame } from './game.js';
 import { suggestRoles } from './suggest.js';
 
 const store = createStore();
@@ -70,7 +71,8 @@ function renderHeader() {
   document.title = tr('app.title');
   document.getElementById('app-title').textContent = tr('app.title');
   const toggle = document.getElementById('lang-toggle');
-  toggle.replaceChildren(...langButtons(state.lang, setLang));
+  const revealing = state.screen === 'deal' && state.dealView === 'reveal';
+  toggle.replaceChildren(...(revealing ? [] : langButtons(state.lang, setLang)));
 }
 
 function langButtons(current, onPick) {
@@ -157,7 +159,7 @@ function closeSheet() {
   document.getElementById('sheet')?.remove();
 }
 
-const teamBadge = (team) => el('span', { class: `badge team-${team}` }, tr(`team.${team}`));
+const teamBadge = (team, lang = state.lang) => el('span', { class: `badge team-${team}` }, t(`team.${team}`, lang));
 
 // ---------- Screen 2: roles ----------
 const expandedRoles = new Set();
@@ -282,9 +284,79 @@ function deleteCustomRole(role) {
   render();
 }
 
+// ---------- Screen 3: deal ----------
+// Taps on "See my role" are ignored this long after a hide, so a double tap
+// on "Seen, hide it" cannot open the next player's role.
+const REVEAL_LOCK_MS = 800;
+let lastHideAt = 0;
+
+function renderDeal() {
+  const total = state.dealt.length;
+  if (state.dealView === 'done' || state.dealIndex >= total) {
+    return el('section', { class: 'stack center screen-fill' },
+      el('p', { class: 'big' }, tr('deal.done')),
+      el('p', { class: 'muted' }, tr('deal.doneHint')),
+      el('button', {
+        class: 'primary',
+        onclick: () => { state.game = newGame(state.dealt); go('tracker'); save(); },
+      }, tr('deal.iAmModerator')));
+  }
+
+  const player = state.dealt[state.dealIndex];
+  const progress = el('p', { class: 'muted' }, tr('deal.progress', { i: state.dealIndex + 1, n: total }));
+
+  if (state.dealView === 'handoff') {
+    return el('section', { class: 'stack center screen-fill' },
+      progress,
+      el('p', {}, tr('deal.handoffLead')),
+      el('p', { class: 'big' }, player.name),
+      el('p', { class: 'muted' }, tr('deal.hint', { name: player.name })),
+      el('button', {
+        class: 'primary',
+        onclick: () => {
+          if (Date.now() - lastHideAt < REVEAL_LOCK_MS) return;
+          state.revealLang = state.lang;
+          state.dealView = 'reveal';
+          render();
+        },
+      }, tr('deal.see')));
+  }
+
+  const lang = state.revealLang;
+  const role = getRole(player.roleId, store.getCustomRoles());
+  return el('section', { class: 'stack' },
+    el('div', { class: 'row', style: 'justify-content:space-between' },
+      el('p', { class: 'muted' }, t('deal.progress', lang, { i: state.dealIndex + 1, n: total })),
+      el('div', { class: 'lang-toggle' }, langButtons(lang, (l) => { state.revealLang = l; render(); }))),
+    el('div', { class: 'card reveal-card' },
+      el('p', { class: 'muted' }, t('deal.youAre', lang, { name: player.name })),
+      el('p', { class: `role-title team-${role.team}` }, localize(role.name, lang)),
+      teamBadge(role.team, lang),
+      el('p', { class: 'role-rules' }, localize(role.rules, lang))),
+    el('button', {
+      class: 'primary',
+      onclick: () => {
+        if (state.dealView !== 'reveal') return;
+        lastHideAt = Date.now();
+        state.dealIndex += 1;
+        state.dealView = state.dealIndex >= total ? 'done' : 'handoff';
+        render();
+        save();
+      },
+    }, t('deal.hide', lang)));
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.screen === 'deal' && state.dealView === 'reveal') {
+    state.dealView = 'handoff';
+    render();
+  }
+});
+
 const SCREENS = {
   players: renderPlayers,
   roles: renderRoles,
+  deal: renderDeal,
 };
 
 function render() {

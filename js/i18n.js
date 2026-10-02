@@ -30,6 +30,16 @@ export const UI = {
   'roles.deleteBlocked': { vi: 'Không thể xóa: vai này đang có trong ván đang chơi.', en: 'Cannot delete: this role is in the game in progress.' },
   'roles.custom': { vi: 'Tùy chỉnh', en: 'Custom' },
 
+  'deal.progress': { vi: 'Người chơi {i}/{n}', en: 'Player {i} of {n}' },
+  'deal.handoffLead': { vi: 'Đưa máy cho', en: 'Pass the phone to' },
+  'deal.hint': { vi: 'Chỉ {name} được nhìn màn hình khi bấm Xem vai.', en: 'Only {name} should look at the screen after tapping See my role.' },
+  'deal.see': { vi: 'Xem vai', en: 'See my role' },
+  'deal.youAre': { vi: '{name}, vai của bạn là', en: '{name}, your role is' },
+  'deal.hide': { vi: 'Đã xem, ẩn đi', en: 'Seen, hide it' },
+  'deal.done': { vi: 'Đưa máy cho quản trò', en: 'Give the phone to the moderator' },
+  'deal.doneHint': { vi: 'Mọi người đã xem vai. Chỉ quản trò được xem màn hình tiếp theo.', en: 'Everyone has seen their role. Only the moderator should see the next screen.' },
+  'deal.iAmModerator': { vi: 'Tôi là quản trò', en: 'I am the moderator' },
+
   'team.wolf': { vi: 'Phe Sói', en: 'Werewolves' },
   'team.village': { vi: 'Phe Dân', en: 'Village' },
   'team.neutral': { vi: 'Trung lập', en: 'Neutral' },
