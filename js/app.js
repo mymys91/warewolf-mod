@@ -1,9 +1,11 @@
 // UI: the only module that touches the DOM.
-import { t, localize } from './i18n.js';
+import { t, localize, phaseLabel } from './i18n.js';
 import { createStore } from './storage.js';
 import { validateSetup, dealRoles } from './deal.js';
 import { allRoles, getRole, createCustomRole, updateCustomRole } from './roles.js';
-import { newGame } from './game.js';
+import {
+  newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, CAUSES,
+} from './game.js';
 import { suggestRoles } from './suggest.js';
 
 const store = createStore();
@@ -20,6 +22,7 @@ const state = {
   dealView: 'handoff',
   revealLang: 'vi',
   game: null,
+  hideBanner: false,
 };
 
 const appEl = document.getElementById('app');
@@ -353,10 +356,109 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ---------- Screen 4: game tracker ----------
+function applyGame(change) {
+  try {
+    state.game = change(state.game);
+    state.hideBanner = false;
+    closeSheet();
+    render();
+    save();
+  } catch (err) {
+    alert(tr(`err.${err.message}`));
+  }
+}
+
+function finishGame(winner) {
+  closeSheet();
+  state.game = endGame(state.game, winner);
+  go('recap');
+}
+
+function renderTracker() {
+  const game = state.game;
+  const customRoles = store.getCustomRoles();
+  const alive = alivePlayers(game);
+  const suggestion = checkWinner(game, customRoles);
+  const upcoming = phaseLabel(nextPhase(game).phase, state.lang);
+
+  const players = game.players.map((p) => {
+    const role = getRole(p.roleId, customRoles);
+    const death = deathOf(game, p.name);
+    return el('button', {
+      class: `player${death ? ' dead' : ''}`,
+      disabled: !!death,
+      onclick: () => openDeathPicker(p.name),
+    },
+    el('span', {}, el('strong', {}, p.name), el('br'),
+      el('span', { class: `meta team-${role.team}` }, localize(role.name, state.lang))),
+    death ? el('span', { class: 'meta' }, `${tr(`causeBtn.${death.cause}`)} · ${phaseLabel(death.phase, state.lang)}`) : null);
+  });
+
+  const banner = suggestion && !state.hideBanner
+    ? el('div', { class: 'banner', role: 'status' },
+      el('strong', {}, tr(`win.${suggestion}`)),
+      el('div', { class: 'row' },
+        el('button', { class: 'grow', onclick: () => finishGame(suggestion) }, tr('tracker.confirm')),
+        el('button', { class: 'grow', onclick: () => { state.hideBanner = true; render(); } }, tr('tracker.keep'))))
+    : null;
+
+  return el('section', { class: 'stack' },
+    el('h2', {}, `${tr('tracker.title')} · ${phaseLabel(game.phase, state.lang)}`),
+    el('p', { class: 'muted' }, tr('tracker.alive', { n: alive.length, total: game.players.length })),
+    banner,
+    el('p', { class: 'muted' }, tr('tracker.hint')),
+    ...players,
+    el('div', { class: 'grid-2' },
+      el('button', { onclick: openNoteForm }, tr('tracker.note')),
+      el('button', { disabled: !game.events.length, onclick: () => applyGame(undo) }, tr('tracker.undo'))),
+    el('button', { class: 'primary', onclick: () => applyGame(nextPhase) }, tr('tracker.next', { phase: upcoming })),
+    el('button', { class: 'danger', style: 'width:100%', onclick: () => openWinnerPicker(suggestion) }, tr('tracker.end')),
+  );
+}
+
+function openDeathPicker(name) {
+  openSheet(
+    el('h2', {}, tr('tracker.howDied', { name })),
+    el('div', { class: 'stack' }, CAUSES.map((cause) => el('button', {
+      style: 'width:100%',
+      onclick: () => applyGame((g) => recordDeath(g, name, cause)),
+    }, tr(`causeBtn.${cause}`)))),
+    el('button', { class: 'ghost', style: 'width:100%', onclick: closeSheet }, tr('common.cancel')),
+  );
+}
+
+function openNoteForm() {
+  const input = el('textarea', { id: 'note-text', 'aria-label': tr('tracker.note') });
+  openSheet(
+    el('h2', {}, tr('tracker.noteTitle', { phase: phaseLabel(state.game.phase, state.lang) })),
+    input,
+    el('div', { class: 'grid-2' },
+      el('button', { onclick: closeSheet }, tr('common.cancel')),
+      el('button', { class: 'primary', onclick: () => applyGame((g) => addNote(g, input.value)) }, tr('common.save'))),
+  );
+  input.focus();
+}
+
+function openWinnerPicker(suggestion) {
+  const options = ['village', 'wolf', 'fool', 'undecided'];
+  if (suggestion) options.sort((a, b) => (b === suggestion) - (a === suggestion));
+  openSheet(
+    el('h2', {}, tr('tracker.pickWinner')),
+    el('div', { class: 'stack' }, options.map((w) => el('button', {
+      class: w === suggestion ? 'primary' : '',
+      style: 'width:100%',
+      onclick: () => finishGame(w),
+    }, tr(`winner.${w}`), w === suggestion ? ` ${tr('tracker.suggested')}` : ''))),
+    el('button', { class: 'ghost', style: 'width:100%', onclick: closeSheet }, tr('common.cancel')),
+  );
+}
+
 const SCREENS = {
   players: renderPlayers,
   roles: renderRoles,
   deal: renderDeal,
+  tracker: renderTracker,
 };
 
 function render() {

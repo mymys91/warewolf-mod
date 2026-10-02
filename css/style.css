@@ -102,8 +102,12 @@ label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 0.9r
 .screen-fill { min-height: 70dvh; display: flex; flex-direction: column; justify-content: center; }
 
 .player { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--surface); }
-.player.dead { opacity: 0.45; text-decoration: line-through; }
-.player .meta { font-size: 0.85rem; color: var(--muted); text-decoration: none; }
+.player.dead { opacity: 0.5; }
+.player.dead strong { text-decoration: line-through; }
+.player .meta { font-size: 0.85rem; color: var(--muted); }
+.player .meta.team-wolf { color: var(--wolf); }
+.player .meta.team-village { color: var(--village); }
+.player .meta.team-neutral { color: var(--neutral); }
 
 .banner { background: var(--accent); color: var(--accent-text); border-radius: var(--radius); padding: 12px; }
 .banner .row { margin-top: 8px; }
