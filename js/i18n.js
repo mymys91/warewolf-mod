@@ -44,6 +44,12 @@ export const UI = {
   'deal.done': { vi: 'Đưa máy cho quản trò', en: 'Give the phone to the moderator' },
   'deal.doneHint': { vi: 'Mọi người đã xem vai. Chỉ quản trò được xem màn hình tiếp theo.', en: 'Everyone has seen their role. Only the moderator should see the next screen.' },
   'deal.iAmModerator': { vi: 'Tôi là quản trò', en: 'I am the moderator' },
+  'check.title': { vi: 'Xem vai riêng', en: 'Private role check' },
+  'check.hint': { vi: 'Chạm vào tên, rồi đưa máy cho người đó.', en: 'Tap a name, then pass the phone to that person.' },
+  'check.start': { vi: 'Bắt đầu ván', en: 'Start game' },
+  'check.back': { vi: 'Quay lại ván', en: 'Back to game' },
+  'check.return': { vi: 'Đưa máy lại cho quản trò', en: 'Give the phone back to the moderator' },
+  'tracker.showRole': { vi: 'Xem vai riêng', en: 'Show a role privately' },
 
   'tracker.title': { vi: 'Theo dõi ván', en: 'Game tracker' },
   'tracker.alive': { vi: '{n}/{total} người còn sống', en: '{n}/{total} players alive' },

@@ -26,6 +26,7 @@ const state = {
   dealView: 'handoff',
   revealLang: 'vi',
   flipPending: false,
+  roleCheck: null,
   game: null,
   hideBanner: false,
 };
@@ -53,9 +54,11 @@ function el(tag, attrs = {}, ...children) {
 
 function save() {
   store.setLang(state.lang);
-  if (state.screen === 'deal' || state.screen === 'tracker') {
+  const stage = { deal: 'deal', tracker: 'tracker' }[state.screen]
+    ?? (state.screen === 'roleCheck' ? (state.roleCheck.from === 'assign' ? 'check' : 'tracker') : null);
+  if (stage) {
     store.setCurrentGame({
-      stage: state.screen,
+      stage,
       dealIndex: state.dealIndex,
       game: state.game ?? { players: state.dealt },
     });
@@ -79,7 +82,8 @@ function renderHeader() {
   document.title = tr('app.title');
   document.getElementById('app-title').textContent = tr('app.title');
   const toggle = document.getElementById('lang-toggle');
-  const revealing = state.screen === 'deal' && state.dealView === 'reveal';
+  const revealing = (state.screen === 'deal' && state.dealView === 'reveal')
+    || (state.screen === 'roleCheck' && state.roleCheck.view === 'reveal');
   toggle.replaceChildren(...(revealing ? [] : langButtons(state.lang, setLang)));
 }
 
@@ -302,11 +306,6 @@ function deleteCustomRole(role) {
 }
 
 // ---------- Assign roles (moderator picks each player's role) ----------
-// Temporary until the private role check screen exists.
-function openRoleCheck() {
-  go('tracker');
-  save();
-}
 
 function renderAssign() {
   state.assignments = pruneAssignments(state.players.length, state.counts, state.assignments);
@@ -438,11 +437,59 @@ function renderDeal() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state.screen === 'deal' && state.dealView === 'reveal') {
+  if (!document.hidden) return;
+  if (state.screen === 'deal' && state.dealView === 'reveal') {
     state.dealView = 'handoff';
+    render();
+  } else if (state.screen === 'roleCheck' && state.roleCheck.view === 'reveal') {
+    state.roleCheck.view = 'handoff';
     render();
   }
 });
+
+// ---------- Private role check ----------
+// The moderator taps a name and hands that player the phone; the list never shows roles.
+function openRoleCheck(from) {
+  state.roleCheck = { view: 'list', index: 0, seen: new Set(), from };
+  go('roleCheck');
+  save();
+}
+
+function renderRoleCheck() {
+  const rc = state.roleCheck;
+  const player = state.game.players[rc.index];
+  if (rc.view === 'handoff') {
+    return renderHandoff(player, null, () => { rc.view = 'reveal'; render(); });
+  }
+  if (rc.view === 'reveal') {
+    return renderReveal(player, null, () => {
+      if (rc.view !== 'reveal') return;
+      rc.seen.add(rc.index);
+      rc.view = 'return';
+      render();
+    });
+  }
+  if (rc.view === 'return') {
+    return el('section', { class: 'stack center screen-fill' },
+      el('p', { class: 'big' }, tr('check.return')),
+      el('button', {
+        class: 'primary',
+        onclick: dealGuard.wrap(() => { rc.view = 'list'; render(); }),
+      }, tr('deal.iAmModerator')));
+  }
+  const fromAssign = rc.from === 'assign';
+  return el('section', { class: 'stack' },
+    el('h2', {}, tr('check.title')),
+    el('p', { class: 'muted' }, tr('check.hint')),
+    state.game.players.map((p, i) => el('button', {
+      class: 'player',
+      onclick: dealGuard.wrap(() => { rc.index = i; rc.view = 'handoff'; render(); }),
+    }, el('strong', {}, p.name), rc.seen.has(i) ? ' ✓' : null)),
+    el('button', {
+      class: 'primary',
+      onclick: dealGuard.wrap(() => { go('tracker'); if (fromAssign) save(); }),
+    }, tr(fromAssign ? 'check.start' : 'check.back')));
+}
 
 // ---------- Screen 4: game tracker ----------
 function applyGame(change) {
@@ -497,6 +544,7 @@ function renderTracker() {
     banner,
     el('p', { class: 'muted' }, tr('tracker.hint')),
     ...players,
+    el('button', { onclick: () => openRoleCheck('tracker') }, tr('tracker.showRole')),
     el('div', { class: 'grid-2' },
       el('button', { onclick: openNoteForm }, tr('tracker.note')),
       el('button', { disabled: !game.events.length, onclick: () => applyGame(undo) }, tr('tracker.undo'))),
@@ -597,6 +645,10 @@ function renderResume() {
       state.dealView = state.dealIndex >= players.length ? 'done' : 'handoff';
       state.game = null;
       go('deal');
+    } else if (saved.stage === 'check') {
+      state.game = { ...newGame(players), ...saved.game };
+      state.roleCheck = { view: 'list', index: 0, seen: new Set(), from: 'assign' };
+      go('roleCheck');
     } else {
       state.game = { ...newGame(players), ...saved.game };
       go('tracker');
@@ -612,6 +664,7 @@ const SCREENS = {
   players: renderPlayers,
   roles: renderRoles,
   assign: renderAssign,
+  roleCheck: renderRoleCheck,
   deal: renderDeal,
   tracker: renderTracker,
   recap: renderRecap,
