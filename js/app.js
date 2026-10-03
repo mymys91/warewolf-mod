@@ -1,7 +1,9 @@
 // UI: the only module that touches the DOM.
 import { t, localize, phaseLabel } from './i18n.js';
 import { createStore } from './storage.js';
-import { validateSetup, dealRoles } from './deal.js';
+import {
+  validateSetup, dealRoles, remainingCounts, validateAssignment, assignRoles, pruneAssignments,
+} from './deal.js';
 import { allRoles, getRole, createCustomRole, updateCustomRole, roleIcon } from './roles.js';
 import {
   newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, timeline, CAUSES,
@@ -18,6 +20,7 @@ const state = {
   players: [],
   counts: {},
   countsFor: null,
+  assignments: {},
   dealt: [],
   dealIndex: 0,
   dealView: 'handoff',
@@ -175,6 +178,7 @@ function renderRoles() {
   if (state.countsFor !== n) {
     state.counts = suggestRoles(n) ?? {};
     state.countsFor = n;
+    state.assignments = {};
   }
   const customRoles = store.getCustomRoles();
   const roles = allRoles(customRoles);
@@ -227,7 +231,8 @@ function renderRoles() {
     ...rows,
     el('button', { onclick: () => openCustomRoleForm(null) }, tr('roles.addCustom')),
     errorList(errors.filter((c) => c === 'COUNT_MISMATCH' || c === 'NO_WOLF')),
-    el('button', { class: 'primary', disabled: errors.length > 0, onclick: onDeal }, tr('roles.deal')),
+    el('button', { class: 'primary', disabled: errors.length > 0, onclick: onDeal }, tr('roles.dealRandom')),
+    el('button', { disabled: errors.length > 0, onclick: () => go('assign') }, tr('roles.modAssign')),
   );
 }
 
@@ -294,6 +299,55 @@ function deleteCustomRole(role) {
   delete state.counts[role.id];
   expandedRoles.delete(role.id);
   render();
+}
+
+// ---------- Assign roles (moderator picks each player's role) ----------
+// Temporary until the private role check screen exists.
+function openRoleCheck() {
+  go('tracker');
+  save();
+}
+
+function renderAssign() {
+  state.assignments = pruneAssignments(state.players.length, state.counts, state.assignments);
+  const customRoles = store.getCustomRoles();
+  const roles = allRoles(customRoles).filter((r) => (state.counts[r.id] ?? 0) > 0);
+  const remaining = remainingCounts(state.counts, state.assignments);
+  const valid = validateAssignment(state.players, state.counts, state.assignments).length === 0;
+
+  const rows = state.players.map((name, i) => {
+    const current = state.assignments[i] ?? '';
+    const select = el('select', {
+      'aria-label': name,
+      onchange: (e) => {
+        if (e.target.value) state.assignments[i] = e.target.value;
+        else delete state.assignments[i];
+        render();
+      },
+    },
+    el('option', { value: '' }, tr('assign.placeholder')),
+    roles.map((r) => el('option', {
+      value: r.id,
+      disabled: remaining[r.id] <= 0 && r.id !== current,
+      selected: r.id === current,
+    }, localize(r.name, state.lang))));
+    return el('div', { class: 'card row assign-row' }, el('strong', { class: 'grow' }, name.trim()), select);
+  });
+
+  return el('section', { class: 'stack' },
+    el('button', { class: 'ghost small', onclick: () => go('roles') }, tr('common.back')),
+    el('h2', {}, tr('assign.title')),
+    el('div', { class: 'assign-left' },
+      roles.map((r) => el('span', { class: 'muted' }, tr('assign.left', { name: localize(r.name, state.lang), n: remaining[r.id] })))),
+    ...rows,
+    el('button', {
+      class: 'primary',
+      disabled: !valid,
+      onclick: () => {
+        state.game = newGame(assignRoles(state.players, state.assignments));
+        openRoleCheck('assign');
+      },
+    }, tr('assign.continue')));
 }
 
 // ---------- Screen 3: deal ----------
@@ -524,6 +578,7 @@ function renderRecap() {
         state.dealt = [];
         state.dealIndex = 0;
         state.countsFor = null;
+        state.assignments = {};
         go('players');
       },
     }, tr('recap.newGame')));
@@ -556,6 +611,7 @@ function renderResume() {
 const SCREENS = {
   players: renderPlayers,
   roles: renderRoles,
+  assign: renderAssign,
   deal: renderDeal,
   tracker: renderTracker,
   recap: renderRecap,
