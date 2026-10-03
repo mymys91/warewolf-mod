@@ -2,7 +2,7 @@
 import { t, localize, phaseLabel } from './i18n.js';
 import { createStore } from './storage.js';
 import { validateSetup, dealRoles } from './deal.js';
-import { allRoles, getRole, createCustomRole, updateCustomRole } from './roles.js';
+import { allRoles, getRole, createCustomRole, updateCustomRole, roleIcon } from './roles.js';
 import {
   newGame, nextPhase, recordDeath, addNote, undo, alivePlayers, deathOf, checkWinner, endGame, timeline, CAUSES,
 } from './game.js';
@@ -22,6 +22,7 @@ const state = {
   dealIndex: 0,
   dealView: 'handoff',
   revealLang: 'vi',
+  flipPending: false,
   game: null,
   hideBanner: false,
 };
@@ -302,6 +303,58 @@ const dealGuard = createTapGuard(800);
 // Tracker actions that can't be undone (phase change, ending the game).
 const trackerGuard = createTapGuard(600);
 
+function roleCardBack(extraClass = '') {
+  return el('div', { class: `role-card ${extraClass}` },
+    el('div', { class: 'role-card-inner' },
+      el('div', { class: 'role-card-face role-card-back' }, el('span', {}, '🌕'))));
+}
+
+function roleCard(player, role, lang, flipped) {
+  return el('div', { class: `role-card team-card-${role.team}${flipped ? ' flipped' : ''}` },
+    el('div', { class: 'role-card-inner' },
+      el('div', { class: 'role-card-face role-card-back' }, el('span', {}, '🌕')),
+      el('div', { class: 'role-card-face role-card-front' },
+        el('div', { class: 'role-icon', 'aria-hidden': 'true' }, roleIcon(role)),
+        el('p', { class: 'muted' }, t('deal.youAre', lang, { name: player.name })),
+        el('p', { class: `role-title team-${role.team}` }, localize(role.name, lang)),
+        teamBadge(role.team, lang),
+        el('p', { class: 'role-rules' }, localize(role.rules, lang)))));
+}
+
+// Hand-off and reveal views shared by the deal and the private role check.
+function renderHandoff(player, progress, onSee) {
+  return el('section', { class: 'stack center screen-fill' },
+    progress ? el('p', { class: 'muted' }, progress) : null,
+    el('p', {}, tr('deal.handoffLead')),
+    el('p', { class: 'big' }, player.name),
+    roleCardBack('small'),
+    el('p', { class: 'muted' }, tr('deal.hint', { name: player.name })),
+    el('button', {
+      class: 'primary',
+      onclick: dealGuard.wrap(() => {
+        state.revealLang = state.lang;
+        state.flipPending = true;
+        onSee();
+      }),
+    }, tr('deal.see')));
+}
+
+function renderReveal(player, progress, onHide) {
+  const lang = state.revealLang;
+  const role = getRole(player.roleId, store.getCustomRoles());
+  // The card flips only on the first render after "See my role", not on a language switch.
+  const animate = state.flipPending && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  state.flipPending = false;
+  const card = roleCard(player, role, lang, !animate);
+  if (animate) requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('flipped')));
+  return el('section', { class: 'stack' },
+    el('div', { class: 'row', style: 'justify-content:space-between' },
+      progress ? el('p', { class: 'muted' }, progress) : el('span'),
+      el('div', { class: 'lang-toggle' }, langButtons(lang, (l) => { state.revealLang = l; render(); }))),
+    card,
+    el('button', { class: 'primary', onclick: dealGuard.wrap(onHide) }, t('deal.hide', lang)));
+}
+
 function renderDeal() {
   const total = state.dealt.length;
   if (state.dealView === 'done' || state.dealIndex >= total) {
@@ -315,45 +368,19 @@ function renderDeal() {
   }
 
   const player = state.dealt[state.dealIndex];
-  const progress = el('p', { class: 'muted' }, tr('deal.progress', { i: state.dealIndex + 1, n: total }));
-
   if (state.dealView === 'handoff') {
-    return el('section', { class: 'stack center screen-fill' },
-      progress,
-      el('p', {}, tr('deal.handoffLead')),
-      el('p', { class: 'big' }, player.name),
-      el('p', { class: 'muted' }, tr('deal.hint', { name: player.name })),
-      el('button', {
-        class: 'primary',
-        onclick: dealGuard.wrap(() => {
-          state.revealLang = state.lang;
-          state.dealView = 'reveal';
-          render();
-        }),
-      }, tr('deal.see')));
+    return renderHandoff(player, tr('deal.progress', { i: state.dealIndex + 1, n: total }), () => {
+      state.dealView = 'reveal';
+      render();
+    });
   }
-
-  const lang = state.revealLang;
-  const role = getRole(player.roleId, store.getCustomRoles());
-  return el('section', { class: 'stack' },
-    el('div', { class: 'row', style: 'justify-content:space-between' },
-      el('p', { class: 'muted' }, t('deal.progress', lang, { i: state.dealIndex + 1, n: total })),
-      el('div', { class: 'lang-toggle' }, langButtons(lang, (l) => { state.revealLang = l; render(); }))),
-    el('div', { class: 'card reveal-card' },
-      el('p', { class: 'muted' }, t('deal.youAre', lang, { name: player.name })),
-      el('p', { class: `role-title team-${role.team}` }, localize(role.name, lang)),
-      teamBadge(role.team, lang),
-      el('p', { class: 'role-rules' }, localize(role.rules, lang))),
-    el('button', {
-      class: 'primary',
-      onclick: dealGuard.wrap(() => {
-        if (state.dealView !== 'reveal') return;
-        state.dealIndex += 1;
-        state.dealView = state.dealIndex >= total ? 'done' : 'handoff';
-        render();
-        save();
-      }),
-    }, t('deal.hide', lang)));
+  return renderReveal(player, t('deal.progress', state.revealLang, { i: state.dealIndex + 1, n: total }), () => {
+    if (state.dealView !== 'reveal') return;
+    state.dealIndex += 1;
+    state.dealView = state.dealIndex >= total ? 'done' : 'handoff';
+    render();
+    save();
+  });
 }
 
 document.addEventListener('visibilitychange', () => {

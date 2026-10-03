@@ -98,9 +98,31 @@ label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 0.9r
 .total.ok { color: var(--village); }
 
 .big { font-size: 1.6rem; font-weight: 700; }
-.reveal-card { text-align: center; padding: 24px 16px; }
-.reveal-card .role-title { font-size: 2rem; font-weight: 800; margin: 8px 0; }
-.reveal-card .role-rules { font-size: 1.05rem; color: var(--text); }
+/* Role card: a 5:7 playing card that flips from its back to its front. */
+.role-card { --team: var(--accent); width: min(100%, 340px); aspect-ratio: 5 / 7; margin: 0 auto; perspective: 1000px; }
+.role-card.small { width: min(55%, 180px); }
+.team-card-wolf { --team: var(--wolf); }
+.team-card-village { --team: var(--village); }
+.team-card-neutral { --team: var(--neutral); }
+.role-card-inner { position: relative; height: 100%; transform-style: preserve-3d; transition: transform 0.5s; }
+.role-card.flipped .role-card-inner { transform: rotateY(180deg); }
+.role-card-face {
+  position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border: 3px solid var(--team); border-radius: 16px; padding: 16px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: color-mix(in srgb, var(--team) 10%, var(--surface));
+}
+.role-card-back {
+  justify-content: center; font-size: 72px; border-color: var(--surface-2);
+  background: repeating-linear-gradient(45deg, var(--surface) 0 12px, var(--bg) 12px 24px);
+}
+.role-card.small .role-card-back { font-size: 48px; }
+.role-card-front { transform: rotateY(180deg); }
+.role-card-front p { margin: 4px 0; }
+.role-icon { font-size: 96px; line-height: 1; margin: 8px 0; }
+.role-card-front .role-title { font-size: 2rem; font-weight: 800; }
+.role-card-front .role-rules { flex: 1; min-height: 0; overflow-y: auto; font-size: 1.05rem; color: var(--text); margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .role-card-inner { transition: none; } }
 .screen-fill { min-height: 70dvh; display: flex; flex-direction: column; justify-content: center; }
 
 .player { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--surface); }
