@@ -13,6 +13,8 @@ is unchanged.
 - A **private role check**: the moderator taps a player's name, hands them the
   phone, and only that player sees their role. Used after the moderator assigns
   roles, and during the game when someone forgets their role (in either mode).
+- The role is shown as a **playing card** with an emoji icon that flips over
+  when it is revealed (§11).
 
 Success: a moderator can run a game in either mode, and any player can see
 their own role privately at any time during the game without seeing anyone
@@ -163,7 +165,81 @@ Manual checks in both languages:
 - Refresh on the Assign, Role check (both `from` values), and Tracker screens.
 - Switching away from the tab during a reveal on the Role check screen.
 
-## 11. Out of scope
+## 11. Role card
+
+The shared reveal view (§6) shows the role as a playing card, on both the Deal
+screen and the Role check screen.
+
+**Icons (`js/roles.js`)**
+
+- Every built-in role gets `icon`: werewolf 🐺, wolfcub 🐾, villager 🧑‍🌾,
+  seer 🔮, bodyguard 🛡️, witch 🧪, hunter 🏹, cupid 💘, fool 🤡.
+  `UNKNOWN_ROLE.icon` is ❓.
+- Custom roles have an optional `icon`. `buildFields` trims `fields.icon`, and
+  when it is empty the role has no `icon` key. `createCustomRole` and
+  `updateCustomRole` carry the icon through. When an update clears the icon,
+  the `icon` key is removed.
+- `roleIcon(role) → string` returns `role.icon` when it is non-empty, and
+  otherwise ❓. The UI always reads the icon through this function.
+- Saved custom roles without `icon` stay valid; `isRoleList` is unchanged.
+
+**Custom role form**
+
+- A new "Biểu tượng / Icon" field below the team field, made of two parts:
+  - a row of tap-to-pick buttons: 🐺 🦊 🧛 👻 🧙 👑 🕵️ 👼 💀 🐍 🌙 ⭐
+  - a text input (`maxlength="8"`) that shows the current value
+- Tapping a button puts its emoji in the input. Saving passes the input's
+  value as `fields.icon`.
+
+**Card**
+
+- The card has a 5:7 aspect ratio and is centred. Its width is
+  `min(100%, 340px)`.
+- It has a 3px border in the team colour (`--wolf`, `--village`, `--neutral`)
+  and a faint tint of the same colour as its background.
+- Front, from top to bottom:
+  - the icon (font-size 96px)
+  - "{name}, your role is"
+  - the role name in the team colour
+  - the team badge
+  - the rules
+- The rules area scrolls (`overflow-y: auto`), so the card never grows taller
+  than its aspect ratio and the "Seen, hide" button stays in view.
+- Back: a 🌕 centred on a dark diagonal-stripe pattern (CSS only).
+
+**Flip**
+
+- The hand-off view shows the card back under the player's name.
+- "See my role" switches to the reveal view. There the card is rendered face
+  down and then flipped: the `flipped` class is added on the next animation
+  frame, giving a 3D `rotateY(180deg)` with `transition: transform 0.5s`.
+- With `@media (prefers-reduced-motion: reduce)` there is no transition, and
+  the card is rendered with `flipped` already on.
+- The VI | EN toggle re-renders the card already flipped, without animating
+  again. The flip animates only on the first render after "See my role".
+- The `visibilitychange` behaviour is unchanged: going back to the hand-off view
+  shows the back again.
+
+**Not changed:** the Tracker, Recap, Roles and Assign screens show no cards and
+no icons.
+
+**Testing**
+
+- `tests/roles.test.js`:
+  - every built-in role has a non-empty `icon`
+  - `createCustomRole` keeps a trimmed icon and has no `icon` key for an
+    empty or whitespace-only icon
+  - `updateCustomRole` replaces the icon, and removes it when cleared
+  - `roleIcon` falls back to ❓
+- Manual checks:
+  - the flip on Deal and on Role check
+  - reduce motion
+  - the VI/EN toggle does not flip the card again
+  - the longest built-in rules (Witch) scroll inside the card
+  - a custom role with and without an icon
+  - a phone width of 320px
+
+## 12. Out of scope
 
 - Players choosing their own role.
 - Saving the ✓ seen marks.

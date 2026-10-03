@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a "moderator assigns" deal mode and a private role check screen that the moderator can open after assigning roles or at any time from the tracker.
+**Goal:** Add a "moderator assigns" deal mode, a private role check screen (opened after assigning or at any time from the tracker), and show the revealed role as a flipping playing card with an emoji icon.
 
-**Architecture:** The pure assignment logic goes in `js/deal.js` and is unit-tested with `node:test`. All DOM work stays in `js/app.js`: two new screens (`assign`, `roleCheck`), and the hand-off and reveal views pulled out of `renderDeal` so the deal and role check screens share them. `js/storage.js` accepts one more saved stage, `'check'`.
+**Architecture:** The pure assignment logic goes in `js/deal.js` and is unit-tested with `node:test`. All DOM work stays in `js/app.js`: two new screens (`assign`, `roleCheck`), and the hand-off and reveal views pulled out of `renderDeal` so the deal and role check screens share them and render the flipping card. Role icons live in `js/roles.js`. `js/storage.js` accepts one more saved stage, `'check'`.
 
 **Tech Stack:** Vanilla ES modules, no build step and no dependencies; tests run with `node --test` (Node 20+).
 
@@ -24,9 +24,9 @@
 
 1. **The moderator lowers a count after assigning roles.** Going back to Roles, lowering "Ma Sói" from 2 to 1 and returning should keep the assignment for the lower-index player and drop the higher one. Pinned by the `pruneAssignments` tests in Task 1.
 2. **A role is set back to the placeholder.** Choosing "— Choose a role —" again must remove the key, not store `''`. An empty string would count as assigned and could let Continue through. Pinned by the `validateAssignment` test "empty string role counts as unassigned" in Task 1.
-3. **A refresh during the role check started from the tracker.** It must resume to the tracker with the game intact, not to the role check. Manual check in Task 5, step 6.
-4. **The tab is hidden while a player is looking at their role on the role check screen.** It must go back to the hand-off view for the same player. Manual check in Task 5, step 6.
-5. **A double tap on "Seen, hide" or "I am the moderator" during the role check.** It must not skip the return view or open the next player. These buttons use `dealGuard`; manual check in Task 5, step 6.
+3. **A refresh during the role check started from the tracker.** It must resume to the tracker with the game intact, not to the role check. Manual check in Task 6, step 6.
+4. **The tab is hidden while a player is looking at their role on the role check screen.** It must go back to the hand-off view for the same player. Manual check in Task 6, step 6.
+5. **A double tap on "Seen, hide" or "I am the moderator" during the role check.** It must not skip the return view or open the next player. These buttons use `dealGuard`; manual check in Task 6, step 6.
 
 ---
 
@@ -174,45 +174,172 @@ git commit -m "feat: accept role-check stage in saved games"
 
 ---
 
-### Task 3: Pull the shared hand-off and reveal views out of `renderDeal`
-
-This is a pure refactor and the deal screen must behave exactly as before. There are no unit tests because the code is DOM-only, so it is verified by hand.
+### Task 3: Role icons and the icon field on custom roles
 
 **Files:**
-- Modify: `js/app.js` (`renderDeal`, about lines 299–351)
+- Modify: `js/roles.js` (the `role()` helper, `BUILTIN_ROLES`, `UNKNOWN_ROLE`, `buildFields`, `createCustomRole`, `updateCustomRole`, the new `roleIcon`)
+- Modify: `js/app.js` (`openCustomRoleForm`)
+- Modify: `js/i18n.js`, `css/style.css`
+- Test: `tests/roles.test.js`
 
 **Interfaces:**
 - Produces:
-  - `renderHandoff(player: {name}, progress: string | null, onSee: () => void) → HTMLElement`: the current hand-off section. The progress line is left out when `progress` is `null`. The "See my role" button runs `dealGuard.wrap(() => { state.revealLang = state.lang; onSee(); })`.
-  - `renderReveal(player: {name, roleId}, progress: string | null, onHide: () => void) → HTMLElement`: the current reveal section, including the VI | EN toggle on `state.revealLang`. `progress` is already localized by the caller; `renderDeal` passes `t('deal.progress', state.revealLang, …)`. The "Seen, hide" button runs `dealGuard.wrap(onHide)`.
-- `renderDeal` keeps its own guard `if (state.dealView !== 'reveal') return;` inside the `onHide` it passes.
+  - `role.icon?: string` on every role object
+  - `roleIcon(role) → string`, exported from `roles.js`: `role.icon` when it is non-empty, otherwise `'❓'`
+  - `fields.icon` (optional string), accepted by `createCustomRole(fields, now)` and `updateCustomRole(existing, fields)`
 
-- [ ] **Step 1: Pull the two functions out and make `renderDeal` call them.** The DOM output must stay the same.
+**Icons** (exact values): werewolf `🐺`, wolfcub `🐾`, villager `🧑‍🌾`, seer `🔮`, bodyguard `🛡️`, witch `🧪`, hunter `🏹`, cupid `💘`, fool `🤡`, `UNKNOWN_ROLE` `❓`. The picker row in the form: `🐺 🦊 🧛 👻 🧙 👑 🕵️ 👼 💀 🐍 🌙 ⭐`.
 
-- [ ] **Step 2: Run the tests**
+- [ ] **Step 1: Write the failing tests** (add `roleIcon` to the import; `valid` is the existing fixture)
+
+```js
+test('every built-in role has an icon', () => {
+  for (const r of BUILTIN_ROLES) assert.ok(r.icon && r.icon.trim(), r.id);
+  assert.equal(getRole('werewolf').icon, '🐺');
+});
+test('createCustomRole keeps a trimmed icon, omits an empty one', () => {
+  assert.equal(createCustomRole({ ...valid, icon: ' 🦊 ' }, 1).icon, '🦊');
+  assert.equal('icon' in createCustomRole({ ...valid, icon: '  ' }, 1), false);
+  assert.equal('icon' in createCustomRole(valid, 1), false);
+});
+test('updateCustomRole replaces and clears the icon', () => {
+  const r = createCustomRole({ ...valid, icon: '🦊' }, 1);
+  assert.equal(updateCustomRole(r, { ...valid, icon: '👻' }).icon, '👻');
+  assert.equal('icon' in updateCustomRole(r, { ...valid, icon: '' }), false);
+});
+test('roleIcon falls back to ❓', () => {
+  assert.equal(roleIcon(createCustomRole(valid, 1)), '❓');
+  assert.equal(roleIcon(getRole('custom-404', [])), '❓');
+  assert.equal(roleIcon(getRole('seer')), '🔮');
+});
+```
+
+- [ ] **Step 2: Run the tests and check that they fail**
+
+Run: `node --test tests/roles.test.js`
+Expected: FAIL, with a SyntaxError saying there is no export named `roleIcon`.
+
+- [ ] **Step 3: Implement the changes in `js/roles.js`**
+  - Add `icon` as the first parameter after `team` in the `role()` helper. Use the icon values above.
+  - In `buildFields`, return `icon` only when `(fields.icon ?? '').trim()` is non-empty.
+  - Make `updateCustomRole` drop the old `icon` before merging, so clearing the icon removes it: `const { icon, ...rest } = existing; return { ...rest, ...buildFields(fields) };`
+
+- [ ] **Step 4: Run all the tests and check that they pass**
 
 Run: `npm test`
 Expected: all tests pass, 0 fail.
 
-- [ ] **Step 3: Check the deal by hand**
+- [ ] **Step 5: Add the icon field to the custom role form**
+  - Add the i18n key `custom.icon`: vi `Biểu tượng`, en `Icon`.
+  - In `openCustomRoleForm`, after the team select, add:
+    - a label
+    - a `div.icon-picker` holding 12 `button type="button" class="small"`; each one sets the input's value to its emoji
+    - `input#f-icon` with `maxlength="8"` and value `existing?.icon ?? ''`
+  - Add `icon: v('icon')` to `fields`.
+  - CSS: `.icon-picker { display: flex; flex-wrap: wrap; gap: 6px; }`, with each button about 1.4rem in font size.
 
-Run `npx serve .`, add 5 players, and deal. Check:
-- The progress line reads "Player 1 of 5".
-- The VI/EN toggle works on the reveal view.
-- Switching tabs on the reveal view goes back to the hand-off view.
-- Double-tapping "Seen, hide" moves on by only one player.
-- The final "I am the moderator" opens the tracker.
+- [ ] **Step 6: Check by hand**
 
-- [ ] **Step 4: Commit**
+Run `npx serve .`.
+- Create a custom role by tapping 🦊, save it, and reopen Edit: the input shows 🦊.
+- Clear the input and save: no error.
+- An older custom role (saved before this change) still loads.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add js/app.js
-git commit -m "refactor: share hand-off and reveal views"
+git add js/roles.js js/app.js js/i18n.js css/style.css tests/roles.test.js
+git commit -m "feat: add role icons and custom role icon picker"
 ```
 
 ---
 
-### Task 4: The two deal buttons on Roles and the Assign screen
+### Task 4: Shared hand-off and reveal views with the flipping role card
+
+Pull the hand-off and reveal views out of `renderDeal` and turn the reveal into a flipping card. The deal screen's flow (steps, guards, the tab-switch reset) must not change. The code is DOM-only, so it is checked by hand.
+
+**Files:**
+- Modify: `js/app.js` (`state`, `renderDeal`, about lines 299–351)
+- Modify: `css/style.css` (replace the `.reveal-card` rules, about lines 99–101)
+
+**Interfaces:**
+- Consumes: `roleIcon` from Task 3.
+- Produces:
+  - `renderHandoff(player: {name}, progress: string | null, onSee: () => void) → HTMLElement`
+    - It shows the current hand-off content, plus `roleCardBack()` under the name.
+    - The progress line is left out when `progress` is `null`.
+    - The "See my role" button runs `dealGuard.wrap(() => { state.revealLang = state.lang; state.flipPending = true; onSee(); })`.
+  - `renderReveal(player: {name, roleId}, progress: string | null, onHide: () => void) → HTMLElement`
+    - It shows the VI | EN toggle (on `state.revealLang`), then `roleCard(player, role, lang)`, then the "Seen, hide" button, which runs `dealGuard.wrap(onHide)`.
+    - `progress` is already localized by the caller; `renderDeal` passes `t('deal.progress', state.revealLang, …)`.
+  - `state.flipPending: boolean`, initially `false`
+- `renderDeal` keeps its own guard `if (state.dealView !== 'reveal') return;` inside the `onHide` it passes.
+
+**Card markup** (built with `el`):
+
+```
+div.role-card.team-card-{team}[.flipped]
+  div.role-card-inner
+    div.role-card-face.role-card-back    → span 🌕
+    div.role-card-face.role-card-front   → .role-icon (roleIcon), p.muted deal.youAre,
+                                           p.role-title.team-{team}, teamBadge, p.role-rules
+```
+
+- `roleCardBack()` is the same wrapper with only the back face, and it is never flipped.
+
+**Flip rule:**
+- When `renderReveal` runs with `state.flipPending === true`:
+  - set `state.flipPending = false`
+  - if `matchMedia('(prefers-reduced-motion: reduce)').matches`, render the card with `.flipped`
+  - otherwise render it without `.flipped` and add the class in `requestAnimationFrame(() => requestAnimationFrame(...))`. The double frame makes sure the transition actually runs.
+- In every other case (the VI/EN toggle re-rendering), render the card with `.flipped` straight away.
+
+**CSS** (values from spec §11):
+- `.role-card`: `width: min(100%, 340px); aspect-ratio: 5 / 7; margin: 0 auto; perspective: 1000px`.
+- `.role-card-inner`: `position: relative; height: 100%; transform-style: preserve-3d; transition: transform 0.5s`.
+- `.flipped .role-card-inner`: `transform: rotateY(180deg)`.
+- Faces:
+  - `position: absolute; inset: 0; backface-visibility: hidden; border: 3px solid var(--team); border-radius: 16px; display: flex; flex-direction: column; align-items: center; padding: 16px`
+  - The front also has `transform: rotateY(180deg)`.
+  - In the front, `.role-rules` gets `flex: 1; overflow-y: auto; min-height: 0`.
+- `.team-card-wolf`, `.team-card-village` and `.team-card-neutral` set `--team` to `var(--wolf)`, `var(--village)` and `var(--neutral)`.
+- The face background is `color-mix(in srgb, var(--team) 10%, var(--surface))`.
+- The back face uses `repeating-linear-gradient(45deg, …)` dark stripes, with the 🌕 at 72px.
+- `.role-icon`: `font-size: 96px; line-height: 1`.
+- `@media (prefers-reduced-motion: reduce) { .role-card-inner { transition: none; } }`.
+
+- [ ] **Step 1: Pull out `renderHandoff` and `renderReveal`, add `roleCard` and `roleCardBack`, and make `renderDeal` call them.**
+
+- [ ] **Step 2: Replace the `.reveal-card` CSS with the card CSS above.** Remove `.reveal-card` if nothing else uses it.
+
+- [ ] **Step 3: Run the tests**
+
+Run: `npm test`
+Expected: all tests pass, 0 fail.
+
+- [ ] **Step 4: Check the deal by hand**
+
+Run `npx serve .`, add 5 players, and deal. Check:
+- The hand-off view shows the card back. "See my role" flips it to the front.
+- The progress line reads "Player 1 of 5".
+- The VI/EN toggle switches the language **without** flipping the card again.
+- The Witch's rules scroll inside the card, and "Seen, hide" stays visible at 320px wide.
+- A custom role without an icon shows ❓.
+- With reduce motion switched on (in the OS, or emulated in DevTools), the front appears with no animation.
+- Switching tabs on the reveal view goes back to the hand-off view, with the card face down.
+- Double-tapping "Seen, hide" moves on by only one player.
+- The final "I am the moderator" opens the tracker.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add js/app.js css/style.css
+git commit -m "feat: share hand-off and reveal views as a flipping role card"
+```
+
+---
+
+### Task 5: The two deal buttons on Roles and the Assign screen
 
 **Files:**
 - Modify: `js/app.js` (`state`, `renderRoles`, the new `renderAssign`, `SCREENS`, the recap "New game" handler)
@@ -223,7 +350,7 @@ git commit -m "refactor: share hand-off and reveal views"
 - Produces:
   - `state.assignments` (initially `{}`)
   - the screen key `'assign'`
-  - `openRoleCheck(from: 'assign' | 'tracker')`, which **Task 5 defines**. For this task, leave a temporary `openRoleCheck = () => go('tracker')` so Continue can be tested; Task 5 replaces it.
+  - `openRoleCheck(from: 'assign' | 'tracker')`, which **Task 6 defines**. For this task, leave a temporary `openRoleCheck = () => go('tracker')` so Continue can be tested; Task 6 replaces it.
 
 **i18n keys** (exact copy):
 
@@ -288,7 +415,7 @@ git commit -m "feat: add moderator-assigns deal mode"
 
 ---
 
-### Task 5: The role check screen, the tracker button, saving and resume
+### Task 6: The role check screen, the tracker button, saving and resume
 
 **Files:**
 - Modify: `js/app.js` (`state`, `openRoleCheck`, the new `renderRoleCheck`, `SCREENS`, `renderTracker`, `save`, `renderResume`, the `visibilitychange` handler)
@@ -296,12 +423,12 @@ git commit -m "feat: add moderator-assigns deal mode"
 
 **Interfaces:**
 - Consumes:
-  - `renderHandoff` and `renderReveal` from Task 3
-  - `state.game`, created by the Continue button in Task 4
+  - `renderHandoff` and `renderReveal` from Task 4
+  - `state.game`, created by the Continue button in Task 5
   - the stage `'check'` from Task 2
 - Produces:
   - `state.roleCheck = { view: 'list' | 'handoff' | 'reveal' | 'return', index: number, seen: Set<number>, from: 'assign' | 'tracker' }`
-  - `openRoleCheck(from)`: sets `state.roleCheck = { view: 'list', index: 0, seen: new Set(), from }`, runs `go('roleCheck')`, then `save()`. It replaces the temporary version from Task 4.
+  - `openRoleCheck(from)`: sets `state.roleCheck = { view: 'list', index: 0, seen: new Set(), from }`, runs `go('roleCheck')`, then `save()`. It replaces the temporary version from Task 5.
 
 **i18n keys** (exact copy):
 
