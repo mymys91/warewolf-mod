@@ -342,10 +342,10 @@ function renderAssign() {
     el('button', {
       class: 'primary',
       disabled: !valid,
-      onclick: () => {
+      onclick: dealGuard.wrap(() => {
         state.game = newGame(assignRoles(state.players, state.assignments));
         openRoleCheck('assign');
-      },
+      }),
     }, tr('assign.continue')));
 }
 
@@ -375,8 +375,9 @@ function roleCard(player, role, lang, flipped) {
 }
 
 // Hand-off and reveal views shared by the deal and the private role check.
-function renderHandoff(player, progress, onSee) {
+function renderHandoff(player, progress, onSee, onBack = null) {
   return el('section', { class: 'stack center screen-fill' },
+    onBack ? el('button', { class: 'ghost small', onclick: dealGuard.wrap(onBack) }, tr('common.back')) : null,
     progress ? el('p', { class: 'muted' }, progress) : null,
     el('p', {}, tr('deal.handoffLead')),
     el('p', { class: 'big' }, player.name),
@@ -459,7 +460,7 @@ function renderRoleCheck() {
   const rc = state.roleCheck;
   const player = state.game.players[rc.index];
   if (rc.view === 'handoff') {
-    return renderHandoff(player, null, () => { rc.view = 'reveal'; render(); });
+    return renderHandoff(player, null, () => { rc.view = 'reveal'; render(); }, () => { rc.view = 'list'; render(); });
   }
   if (rc.view === 'reveal') {
     return renderReveal(player, null, () => {
@@ -544,7 +545,7 @@ function renderTracker() {
     banner,
     el('p', { class: 'muted' }, tr('tracker.hint')),
     ...players,
-    el('button', { onclick: () => openRoleCheck('tracker') }, tr('tracker.showRole')),
+    el('button', { onclick: dealGuard.wrap(() => openRoleCheck('tracker')) }, tr('tracker.showRole')),
     el('div', { class: 'grid-2' },
       el('button', { onclick: openNoteForm }, tr('tracker.note')),
       el('button', { disabled: !game.events.length, onclick: () => applyGame(undo) }, tr('tracker.undo'))),
