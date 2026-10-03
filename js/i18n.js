@@ -103,6 +103,7 @@ export const UI = {
   'custom.nameEn': { vi: 'Tên vai (Tiếng Anh, không bắt buộc)', en: 'Role name (English, optional)' },
   'custom.rulesEn': { vi: 'Luật chơi (Tiếng Anh, không bắt buộc)', en: 'Rules (English, optional)' },
   'custom.team': { vi: 'Phe', en: 'Team' },
+  'custom.icon': { vi: 'Biểu tượng', en: 'Icon' },
 
   'err.NAME_REQUIRED': { vi: 'Hãy nhập tên vai bằng Tiếng Việt.', en: 'Enter the role name in Vietnamese.' },
   'err.RULES_REQUIRED': { vi: 'Hãy nhập luật chơi bằng Tiếng Việt.', en: 'Enter the rules in Vietnamese.' },

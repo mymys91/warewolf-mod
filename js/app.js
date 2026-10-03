@@ -230,6 +230,8 @@ function renderRoles() {
   );
 }
 
+const ICON_CHOICES = ['🐺', '🦊', '🧛', '👻', '🧙', '👑', '🕵️', '👼', '💀', '🐍', '🌙', '⭐'];
+
 function openCustomRoleForm(existing) {
   const field = (key, tag, value) => {
     const input = el(tag, { id: `f-${key}`, value: value ?? '' });
@@ -241,12 +243,15 @@ function openCustomRoleForm(existing) {
       if ((existing?.team ?? 'village') === tm) o.selected = true;
       return o;
     }));
+  const icon = el('input', { id: 'f-icon', maxlength: '8', value: existing?.icon ?? '' });
+  const iconPicker = el('div', { class: 'icon-picker' },
+    ICON_CHOICES.map((emoji) => el('button', { type: 'button', class: 'small', onclick: () => { icon.value = emoji; } }, emoji)));
   const errorsBox = el('div');
   const form = el('form', {
     onsubmit: (e) => {
       e.preventDefault();
       const v = (id) => form.querySelector(`#f-${id}`).value;
-      const fields = { nameVi: v('nameVi'), rulesVi: v('rulesVi'), nameEn: v('nameEn'), rulesEn: v('rulesEn'), team: v('team') };
+      const fields = { nameVi: v('nameVi'), rulesVi: v('rulesVi'), nameEn: v('nameEn'), rulesEn: v('rulesEn'), team: v('team'), icon: v('icon') };
       try {
         const roles = store.getCustomRoles();
         if (existing) {
@@ -267,6 +272,7 @@ function openCustomRoleForm(existing) {
   ...field('nameEn', 'input', existing?.name.en),
   ...field('rulesEn', 'textarea', existing?.rules.en),
   el('label', { for: 'f-team' }, tr('custom.team')), team,
+  el('label', { for: 'f-icon' }, tr('custom.icon')), iconPicker, icon,
   errorsBox,
   el('div', { class: 'grid-2', style: 'margin-top:16px' },
     el('button', { type: 'button', onclick: closeSheet }, tr('common.cancel')),

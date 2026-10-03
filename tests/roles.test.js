@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BUILTIN_ROLES, allRoles, getRole, createCustomRole, updateCustomRole,
+  BUILTIN_ROLES, allRoles, getRole, createCustomRole, updateCustomRole, roleIcon,
 } from '../js/roles.js';
 
 const valid = { nameVi: 'Già Làng', rulesVi: 'Sống 2 mạng', nameEn: '', rulesEn: '', team: 'village' };
@@ -69,4 +69,27 @@ test('updateCustomRole keeps id and validates', () => {
   assert.equal(u.name.vi, 'Trưởng Làng');
   assert.equal(u.team, 'neutral');
   assert.throws(() => updateCustomRole(r, { ...valid, nameVi: '' }), /NAME_REQUIRED/);
+});
+
+test('every built-in role has an icon', () => {
+  for (const r of BUILTIN_ROLES) assert.ok(r.icon && r.icon.trim(), r.id);
+  assert.equal(getRole('werewolf').icon, '🐺');
+});
+
+test('createCustomRole keeps a trimmed icon, omits an empty one', () => {
+  assert.equal(createCustomRole({ ...valid, icon: ' 🦊 ' }, 1).icon, '🦊');
+  assert.equal('icon' in createCustomRole({ ...valid, icon: '  ' }, 1), false);
+  assert.equal('icon' in createCustomRole(valid, 1), false);
+});
+
+test('updateCustomRole replaces and clears the icon', () => {
+  const r = createCustomRole({ ...valid, icon: '🦊' }, 1);
+  assert.equal(updateCustomRole(r, { ...valid, icon: '👻' }).icon, '👻');
+  assert.equal('icon' in updateCustomRole(r, { ...valid, icon: '' }), false);
+});
+
+test('roleIcon falls back to ❓', () => {
+  assert.equal(roleIcon(createCustomRole(valid, 1)), '❓');
+  assert.equal(roleIcon(getRole('custom-404', [])), '❓');
+  assert.equal(roleIcon(getRole('seer')), '🔮');
 });

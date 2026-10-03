@@ -58,6 +58,8 @@ button.primary { width: 100%; background: var(--accent); color: var(--accent-tex
 button.danger { background: var(--danger); color: #fff; }
 button.ghost { background: transparent; color: var(--muted); }
 button.small { min-height: 44px; min-width: 44px; padding: 8px 12px; }
+.icon-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.icon-picker button { font-size: 1.4rem; padding: 4px 8px; }
 
 input, textarea, select {
   width: 100%;
