@@ -36,3 +36,42 @@ export function dealRoles(players, counts, rng = cryptoRandom) {
   }
   return players.map((name, i) => ({ name: name.trim(), roleId: pool[i] }));
 }
+
+// Moderator-assigned roles. Assignments map player index → role id.
+export function remainingCounts(counts, assignments) {
+  const left = { ...counts };
+  for (const id of Object.values(assignments)) {
+    if (id in left) left[id] -= 1;
+  }
+  return left;
+}
+
+export function validateAssignment(players, counts, assignments) {
+  const errors = [];
+  if (players.some((_, i) => !assignments[i])) errors.push('UNASSIGNED');
+  const used = {};
+  for (const id of Object.values(assignments)) {
+    if (id) used[id] = (used[id] ?? 0) + 1;
+  }
+  if (Object.entries(used).some(([id, n]) => n > (counts[id] ?? 0))) errors.push('OVER_ASSIGNED');
+  return errors;
+}
+
+export function assignRoles(players, assignments) {
+  return players.map((name, i) => ({ name: name.trim(), roleId: assignments[i] }));
+}
+
+// Drops assignments that no longer fit; lower player indexes keep their role.
+export function pruneAssignments(playerCount, counts, assignments) {
+  const used = {};
+  const kept = {};
+  const indexes = Object.keys(assignments).map(Number).sort((a, b) => a - b);
+  for (const i of indexes) {
+    const id = assignments[i];
+    if (i >= playerCount || !id) continue;
+    if ((used[id] ?? 0) >= (counts[id] ?? 0)) continue;
+    used[id] = (used[id] ?? 0) + 1;
+    kept[i] = id;
+  }
+  return kept;
+}
