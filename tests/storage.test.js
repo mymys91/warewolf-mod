@@ -102,3 +102,12 @@ test('saved games with malformed players, events or phase are treated as missing
   b.setItem('ww.currentGame', JSON.stringify({ stage: 'deal', dealIndex: 1, game: { players: [{ name: 'An', roleId: 'werewolf' }] } }));
   assert.notEqual(createStore(b).getCurrentGame(), null, 'deal-stage save without phase/events stays valid');
 });
+
+test('stage check round-trips; unknown stage still rejected', () => {
+  const store = createStore(fakeStorage());
+  const saved = { stage: 'check', dealIndex: 0, game: { players: [{ name: 'An', roleId: 'werewolf' }] } };
+  store.setCurrentGame(saved);
+  assert.deepEqual(store.getCurrentGame(), saved);
+  store.setCurrentGame({ ...saved, stage: 'assign' });
+  assert.equal(store.getCurrentGame(), null);
+});

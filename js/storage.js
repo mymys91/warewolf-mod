@@ -26,7 +26,7 @@ const isRoleList = (v) => Array.isArray(v) && v.every((r) => r && typeof r.id ==
 const isPlayer = (p) => p && typeof p.name === 'string' && typeof p.roleId === 'string';
 const isPhase = (ph) => ph && (ph.kind === 'night' || ph.kind === 'day') && Number.isInteger(ph.number);
 const isSavedGame = (v) => v && typeof v === 'object'
-  && (v.stage === 'deal' || v.stage === 'tracker')
+  && (v.stage === 'deal' || v.stage === 'check' || v.stage === 'tracker')
   && Number.isInteger(v.dealIndex)
   && v.game && Array.isArray(v.game.players) && v.game.players.every(isPlayer)
   && (v.game.events === undefined || Array.isArray(v.game.events))
